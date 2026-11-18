@@ -23507,6 +23507,88 @@
    "retired_in": ""
   },
   {
+   "name": "STRATA_PARALLEL_RECYCLE_MAX",
+   "backends": [
+    "cuda-hip"
+   ],
+   "reads": [
+    {
+     "file": "engine/src/program/generate.cpp",
+     "line": 7653,
+     "backend": "cuda-hip",
+     "fn": "getenv"
+    },
+    {
+     "file": "engine/src/program/generate.cpp",
+     "line": 7655,
+     "backend": "cuda-hip",
+     "fn": "env_seconds"
+    }
+   ],
+   "parse": "int",
+   "default_state": null,
+   "code_default": null,
+   "engine_sets": [],
+   "engine_defaults": [],
+   "launch_files": [],
+   "launch_sets": [],
+   "launch_reads": [],
+   "doc_mentions": [
+    "docs/BATCHING.md:794"
+   ],
+   "first_commit": null,
+   "first_date": null,
+   "since": null,
+   "last_commit": null,
+   "last_date": null,
+   "status": "opt-in",
+   "owner": "program/generate.cpp",
+   "note": "PR #6159 port: the upper bound of --parallel-recycle's idle window, in whole seconds (default 600, 1..86400; a value that is not one warns and keeps 600). The grace starts at MIN and doubles when a burst follows a recycle, up to this; MIN == MAX is the fixed-window mode. Read once at start-up. (The scanner reads this as a string until it knows the env_seconds helper, so a regen would change only this field.)",
+   "retire_after": "",
+   "retired_in": ""
+  },
+  {
+   "name": "STRATA_PARALLEL_RECYCLE_MIN",
+   "backends": [
+    "cuda-hip"
+   ],
+   "reads": [
+    {
+     "file": "engine/src/program/generate.cpp",
+     "line": 7654,
+     "backend": "cuda-hip",
+     "fn": "getenv"
+    },
+    {
+     "file": "engine/src/program/generate.cpp",
+     "line": 7656,
+     "backend": "cuda-hip",
+     "fn": "env_seconds"
+    }
+   ],
+   "parse": "int",
+   "default_state": null,
+   "code_default": null,
+   "engine_sets": [],
+   "engine_defaults": [],
+   "launch_files": [],
+   "launch_sets": [],
+   "launch_reads": [],
+   "doc_mentions": [
+    "docs/BATCHING.md:794"
+   ],
+   "first_commit": null,
+   "first_date": null,
+   "since": null,
+   "last_commit": null,
+   "last_date": null,
+   "status": "opt-in",
+   "owner": "program/generate.cpp",
+   "note": "PR #6159 port: the base grace of --parallel-recycle's idle window, in whole seconds (default 2, 1..86400; MIN above MAX warns and uses MAX). No request in flight or queued for this long after a burst frees every batch slot session, which returns their VRAM to the expert cache. Read once at start-up.",
+   "retire_after": "",
+   "retired_in": ""
+  },
+  {
    "name": "STRATA_PARITY_DUMP",
    "backends": [
     "cuda-hip"
