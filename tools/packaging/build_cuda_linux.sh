@@ -32,6 +32,17 @@ case "$variant:$cudafull" in
   *) echo "build_cuda_linux.sh: $variant needs the matching CUDA toolkit; nvcc here is ${cudafull:-missing}" >&2; exit 2 ;;
 esac
 
+# Where the CUDA runtime libraries live (cudart, cublas, cublasLt) for collect_libs.py. The release build machine has
+# /usr/local/cuda; a distro toolkit often lives elsewhere (Arch: /opt/cuda), so this is detected from nvcc unless CUDA_LIB_DIR names it.
+cuda_lib=${CUDA_LIB_DIR:-/usr/local/cuda/lib64}
+if [ ! -d "$cuda_lib" ] && command -v nvcc >/dev/null 2>&1; then
+  cuda_lib=$(dirname "$(dirname "$(readlink -f "$(command -v nvcc)")")")/lib64
+fi
+[ -d "$cuda_lib" ] || { echo "build_cuda_linux.sh: CUDA library folder not found (tried /usr/local/cuda/lib64); set CUDA_LIB_DIR" >&2; exit 2; }
+# PORTABLE=OFF builds for THIS machine only: native code (AVX-512 on this i9-11900K) instead of the AVX2 release baseline.
+# Only use it for a binary that never leaves the machine it was built on.
+portable=${PORTABLE:-ON}
+
 real=""; for a in $(echo "$archs" | tr ';,' '  '); do real="$real;${a}-real"; done; real=${real#;}
 last=$(echo "$archs" | tr ';,' '  ' | awk '{print $NF}')
 cd "$repo"
@@ -41,7 +52,7 @@ ggml=""; [ -z "${STRATA_GGML_DIR:-}" ] || ggml="-DSTRATA_GGML_DIR=$STRATA_GGML_D
 #   STRATA_CMAKE_EXTRA="-DSTRATA_GEOMETRY_FILE=/abs/path/geometry.hpp"   (or -DSTRATA_GEOMETRY=<name>)
 # shellcheck disable=SC2086
 cmake -G Ninja -S engine -B "$build" -DCMAKE_BUILD_TYPE=Release -DSTRATA_ENABLE_CUDA=ON -DSTRATA_BUILD_TESTS=OFF \
-    -DSTRATA_EXPERIMENTAL_SM60=$sm60 -DSTRATA_NATIVE_EXPERTS=ON -DSTRATA_PORTABLE=ON -DSTRATA_Q6K_EXPERTS=ON \
+    -DSTRATA_EXPERIMENTAL_SM60=$sm60 -DSTRATA_NATIVE_EXPERTS=ON -DSTRATA_PORTABLE=$portable -DSTRATA_Q6K_EXPERTS=ON \
     "-DCMAKE_CUDA_ARCHITECTURES=${real};${last}-virtual" $ggml ${STRATA_CMAKE_EXTRA:-} $shape_cmake
 # (llama.cpp's MMQ and strata_kq left the tree in 0.2.16; MMQ comparison builds come from the v0.2.15 tag)
 . "$repo/tools/packaging/engine_targets.sh"
@@ -70,7 +81,7 @@ if [ -f "$vision_dir/bin/strata-vision" ]; then
   vision_json=", \"vision_archs\": \"$archs\""        # package_engine.py refuses a reader whose archs do not cover the engine's
 fi
 echo "{\"version\": \"$ver\", \"source\": \"tools/packaging/build_cuda_linux.sh\", \"archs\": \"$archs\", \"cuda\": \"$cudafull\", \"portable\": true$vision_json}" > "$stage/BUILD.json"
-"$py" tools/packaging/collect_libs.py --binary "$build/strata" --search /usr/local/cuda/lib64 --out "$stage" --also 'libcublasLt.so*'
+"$py" tools/packaging/collect_libs.py --binary "$build/strata" --search "$cuda_lib" --out "$stage" --also 'libcublasLt.so*'
 shape_check env LD_LIBRARY_PATH="$stage" "$stage/strata"
 arch_args=""; for a in $(echo "$archs" | tr ';,' '  '); do arch_args="$arch_args --arch sm_$a"; done
 mkdir -p "$out"
