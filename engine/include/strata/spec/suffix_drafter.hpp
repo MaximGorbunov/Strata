@@ -5,9 +5,12 @@
 // accepts many tokens at once. It needs no model and costs microseconds.
 //
 // Index: every trigram of the history (prompt + accepted output) maps to its WAYS most recent end positions in a
-// fixed-size open-addressing table, so memory is bounded (~20 bytes per history token) and appends are O(1).
-// A proposal checks those candidates, extends each match backwards up to `max_match`, and takes the longest
-// (most recent on ties). Matches shorter than `min_match` propose nothing.
+// fixed-size open-addressing table, and so does every LONG_ORDER-gram in a second one: a common trigram's few slots
+// fill with recent repeats, while the longer key still finds an old source of the text being quoted (ported from
+// basalt_ada 97bf1f16, the same lineage's Ada fork; output unchanged because every proposal is verified).
+// Memory is bounded and appends are O(1). A proposal checks the candidates of both tables, extends each match
+// backwards up to `max_match`, and takes the longest (most recent on ties). Matches shorter than `min_match`
+// propose nothing.
 #pragma once
 
 #include <cstddef>
@@ -19,6 +22,7 @@ namespace strata::spec {
 class SuffixDrafter {
 public:
     static constexpr int WAYS = 4;
+    static constexpr int LONG_ORDER = 8;
 
     explicit SuffixDrafter(int min_match = 3, int max_match = 32, size_t capacity_tokens = 1u << 19);
 
@@ -46,12 +50,16 @@ private:
         uint32_t pos[WAYS] = {};      // end positions, most recent first
         uint8_t n = 0;
     };
-    Slot* find_slot(uint64_t key, bool insert);
+    Slot* find_slot(std::vector<Slot>& table, uint64_t key, bool insert);
+    static void push(Slot* s, size_t end);
     uint64_t key_at(size_t end) const;
+    uint64_t long_key_at(size_t end) const;
 
     int min_match_, max_match_;
     std::vector<int32_t> hist_;
-    std::vector<Slot> table_;
+    static constexpr uint32_t kLongBit = 1u << 31;
+    std::vector<Slot> table_, long_;
+    std::vector<uint32_t> dirty_;   // the slots in use (long table flagged), so a reset clears only those
     size_t mask_ = 0;
     int last_match_ = 0;
 };
